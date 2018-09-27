@@ -1,11 +1,11 @@
 {
-  "name": "vuex-storagecache",
+  "name": "vue-axiosapi",
   "description": "",
   "version": "0.0.1",
   "author": "+v <ljw@live.jp>",
   "repository": {
     "type": "git",
-    "url": "https://github.com/chiaweilee/vuex-storagecache.git"
+    "url": "https://github.com/chiaweilee/vue-axiosapi.git"
   },
   "main": "./lib/index.js",
   "scripts": {
@@ -17,6 +17,7 @@
   },
   "keywords": [],
   "dependencies": {
+    "lodash.merge": "^4.6.1",
     "vue": "^2.5.16"
   },
   "devDependencies": {

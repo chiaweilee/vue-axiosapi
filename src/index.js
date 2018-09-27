@@ -1,66 +1,60 @@
-const set = (name, data, useSession) => (useSession ? sessionStorage : localStorage).setItem(name, JSON.stringify(data))
-const get = (name, useSession) => {
-  try {
-    return JSON.parse((useSession ? sessionStorage : localStorage).getItem(name)) || {}
-  } catch (err) {
-    console.error(err)
-    return {}
-  }
-}
+import axios from 'axios'
+import merge from 'lodash.merge'
 
-export default option => store => {
-  // initialized
-  const xName = option.name || 'x_stateCache'
-  const { cacheState, sessionState } = option
-  const { state, _vm } = store
-  const { $set } = _vm
-  const stateCache = get(xName)
-  const sessionCache = get(xName, true)
-  // fn
-  const climb = (cacheName, writeValue, useSession) => {
-    let value = state
-    cacheName = cacheName.split('.')
-    const lastIndex = cacheName.length - 1
-    cacheName.forEach((name, index) => {
-      if (writeValue && lastIndex === index) {
-        const cache = useSession ? sessionCache : stateCache
-        if (!!cache.name && Object.keys(cache.name).length) {
-          console.log(value)
-          console.log(name)
-          console.log(cache.name)
-          $set(value, name, cache.name)
+export default {
+  install (Vue, option) {
+    const { name: api = '$api', defaults, interceptors, preset } = option
+    if (!this.installed) {
+      // axios global defaults
+      if (typeof defaults === 'object') {
+        Object.keys(defaults).forEach(_ => {
+          axios.defaults[_] = defaults[_]
+        })
+      }
+      // axios global interceptors
+      if (typeof interceptors === 'object') {
+        if (interceptors.request) {
+          axios.interceptors.request.use(interceptors.request)
         }
-        return
+        if (interceptors.response) {
+          axios.interceptors.response.use(
+            interceptors.response.success || null,
+            interceptors.response.error || null
+          )
+        }
       }
-      value = value[name]
-    })
-    return value
+      // install
+      Object.defineProperty(Vue.prototype, api, {
+        value () {
+          if (typeof preset === 'object' && !!arguments[0] && preset.hasOwnProperty(arguments[0])) {
+            const [name, layout] = arguments
+            const [url, config] = preset[name]
+            if (layout) { // merge config
+              merge(config, layout)
+            }
+            if (config.data) { // clean
+              Object.keys(config.data).forEach(d => {
+                if ([null, undefined].indexOf(config.data[d]) > -1) {
+                  config.data[d] = ''
+                }
+              })
+            }
+            return axios(url, config)
+          } else {
+            const [url, config] = arguments
+            console.warn(`Can not find preset of '${arguments[0]}', use normal http request instead.`)
+            if ((!!config && typeof config !== 'object') || arguments.length > 2) {
+              console.warn('Please use api(url[, config]) to request http.')
+            }
+            if (/http[s]?:\/\//i.test(url)) {
+              config.baseURL = null
+            }
+            return axios(url, config)
+          }
+        }
+      })
+      // install complete
+      this.installed = true
+    }
   }
-  const watch = (cacheName, useSession) => {
-    store.watch(
-      store => climb(cacheName),
-      to => {
-        const cache = get(xName, !!useSession)
-        cache[cacheName] = to
-        set(xName, cache, !!useSession)
-      },
-      {
-        deep: true
-      }
-    )
-  }
-  // check
-  if (!(cacheState instanceof Array)) {
-    console.warn('cacheState should be an Array.')
-    return
-  }
-  //
-  cacheState.forEach(cacheName => {
-    climb(cacheName, true)
-    watch(cacheName)
-  })
-  sessionState.forEach(cacheName => {
-    climb(cacheName, true, true)
-    watch(cacheName, true)
-  })
 }
